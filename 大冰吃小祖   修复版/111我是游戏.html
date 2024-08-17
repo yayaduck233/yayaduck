@@ -1,0 +1,437 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>大冰吃小祖</title>
+<style>
+body, html {
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+}
+canvas {
+    background-size: cover;
+    background-position: center;
+    display: block;
+    margin: 0 auto;
+    width: 100vw;
+    height: 100vh;
+}
+#score {
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    font-size: 24px;
+    color: white;
+}
+#controls {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+}
+#controls button {
+    margin-left: 5px;
+    font-size: 18px;
+}
+#startScreen {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.8);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    flex-direction: column;
+    color: white;
+    text-align: center;
+}
+#startScreen h1 {
+    font-size: 32px;
+    margin-bottom: 20px;
+}
+#startScreen #better {
+    color: red;
+}
+#startScreen button {
+    font-size: 24px;
+    padding: 10px 20px;
+    cursor: pointer;
+}
+#gameOverScreen {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.8);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    flex-direction: column;
+    color: white;
+    text-align: center;
+    display: none;
+}
+#gameOverScreen button {
+    font-size: 24px;
+    padding: 10px 20px;
+    cursor: pointer;
+    margin-top: 20px;
+}
+</style>
+</head>
+<body>
+<canvas id="gameCanvas" style="background-image: url('屏幕截图 2024-07-04 181357.png');"></canvas>
+<div id="score">Score: 0</div>
+<div id="controls">
+    <button id="pauseButton">Pause</button>
+    <button id="resumeButton" style="display: none;">Resume</button>
+    <button id="exitButton">Exit</button>
+    <!-- 新增背景音乐控制按钮 -->
+    <button id="musicToggleButton">关闭音乐</button>
+</div>
+
+<div id="startScreen">
+    <h1 style="text-align: center;">
+        使用键盘上下左右箭头键操作厚兰德，努力躲过巨大生煎包的袭击，并吃掉小小生煎包 to become A BETTER SUPE，向老爸证明<span id="better">I AM BETTER</span>并成功继承他的宠物小羊吧！
+    </h1>
+<h2 style="text-align: center; margin-top: 20px;">
+        进入游戏后请<span id="better">双击ctrl键</span>开启bgm（按F11进入全屏模式体验更佳，请务必开启bgm 后面有彩蛋）
+    </h2>
+    <h2 style="text-align: center; margin-top: 20px;">
+        enter键→开始游戏
+    </h2>
+<h2 style="text-align: center; margin-top: 20px;">
+         空格键→暂停游戏
+    </h2>
+<h2 style="text-align: center; margin-top: 20px;">
+        ESC键→退出游戏
+    </h2>
+<h2 style="text-align: center; margin-top: 20px;">
+        ctrl键→开关bgm
+    </h2>
+
+
+    <button id="startButton">开始游戏</button>
+</div>
+
+<div id="gameOverScreen">
+    <h1 style="text-align: center;">
+很遗憾，你被老爸吃掉了，小羊又落入生煎包毒手了。。 。加油吧厚兰德！
+</h1>
+<h1 style="text-align: center;">
+你的分数是<span id="finalScore"></span></h1>
+    <button id="restartButton">按ctrl+R重开</button>
+</div>
+
+<!-- 添加音频元素 -->
+<audio id="backgroundMusic" loop>
+    <source src="And One - Enjoy The Unknown.mp3" type="audio/mp3">
+    Your browser does not support the audio element.
+</audio>
+
+<audio id="updateMusic">
+    <source src="更新 结算音乐.mp3" type="audio/mp3">
+    Your browser does not support the audio element.
+</audio>
+
+<script>
+// JavaScript部分
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+
+canvas.width = window.innerWidth;
+canvas.height = window.innerHeight;
+
+let score = 0;
+let playerSize = 30;
+let gamePaused = false;
+let lastMilestone = 0;
+let gameOver = false;
+let currentBackground = 'url("屏幕截图 2024-07-04 181357.png")'; 
+let musicPlaying = true; 
+
+const player = {
+    x: canvas.width / 2,
+    y: canvas.height / 2,
+    width: 30,
+    height: 30,
+    dx: 0,
+    dy: 0,
+    speed: 3,
+    image: new Image()
+};
+player.image.src = '屏幕截图 2024-01-06 145138.png';
+
+const fishArray = [];
+let currentAudio = null;
+
+const backgroundMusic = document.getElementById('backgroundMusic');
+backgroundMusic.volume = 0.13;
+
+const updateMusic = document.getElementById('updateMusic'); // 获取新音频元素
+
+// 自动播放背景音乐
+document.getElementById('startButton').addEventListener('click', () => {
+    backgroundMusic.play();
+});
+
+document.getElementById('musicToggleButton').addEventListener('click', toggleMusic);
+
+document.addEventListener('keydown', function(event) {
+    if (event.ctrlKey) {
+        toggleMusic();
+    }
+});
+
+function toggleMusic() {
+    if (musicPlaying) {
+        backgroundMusic.pause();
+        document.getElementById('musicToggleButton').textContent = '开启音乐';
+    } else {
+        backgroundMusic.play();
+        document.getElementById('musicToggleButton').textContent = '关闭音乐';
+    }
+    musicPlaying = !musicPlaying;
+}
+
+class Fish {
+    constructor(x, y, width, height, speed, direction) {
+        this.x = x;
+        this.y = y;
+        this.width = width;
+        this.height = height;
+        this.speed = Math.random() * 0.5 + 0.5;
+        this.direction = direction;
+        this.image = new Image();
+        this.image.src = '屏幕截图 2024-01-06 153158.png';
+    }
+
+    draw() {
+        ctx.drawImage(this.image, this.x, this.y, this.width, this.height);
+    }
+
+    update() {
+        this.x += this.speed * this.direction;
+        if (this.direction > 0 && this.x - this.width > canvas.width) {
+            this.reset();
+        } else if (this.direction < 0 && this.x + this.width < 0) {
+            this.reset();
+        }
+
+        this.draw();
+    }
+
+    reset() {
+        this.y = Math.random() * (canvas.height - this.height);
+        this.direction = Math.random() > 0.5 ? 1 : -1;
+        this.x = this.direction > 0 ? -this.width : canvas.width + this.width;
+        this.speed = Math.random() * 0.5 + 0.5;
+    }
+}
+
+function countFishSizes() {
+    let largerCount = 0;
+    let smallerCount = 0;
+
+    fishArray.forEach(fish => {
+        if (fish.width > player.width) {
+            largerCount++;
+        } else {
+            smallerCount++;
+        }
+    });
+
+    return { largerCount, smallerCount };
+}
+
+function spawnFish() {
+    const { largerCount, smallerCount } = countFishSizes();
+    let isLarger = false;
+
+    if (largerCount < smallerCount) {
+        isLarger = true;
+    } else if (largerCount > smallerCount) {
+        isLarger = false;
+    } else {
+        isLarger = Math.random() > 0.5;
+    }
+
+    const sizeVariation = isLarger ? 1 : -1;
+    const minSize = 20; // 定义比玩家鱼小的鱼的最小尺寸
+    const maxSize = player.width - 5; // 定义比玩家鱼小的鱼的最大尺寸
+    const width = isLarger
+        ? player.width + (Math.random() * 25 + 25) // 增大比玩家鱼大的鱼的尺寸
+        : Math.max(minSize, Math.min(maxSize, player.width - (Math.random() * 15 + 10)));
+    const height = width;
+    const y = Math.random() * (canvas.height - height);
+    const direction = Math.random() > 0.5 ? 1 : -1;
+    const x = direction > 0 ? -width : canvas.width + width;
+    const speed = Math.random() * 0.5 + 0.5;
+    fishArray.push(new Fish(x, y, width, height, speed, direction));
+}
+function updatePlayer() {
+    player.x += player.dx;
+    player.y += player.dy;
+
+    if (player.x < 0) player.x = 0;
+    if (player.x > canvas.width - player.width) player.x = canvas.width - player.width;
+    if (player.y < 0) player.y = 0;
+    if (player.y > canvas.height - player.height) player.y = canvas.height - player.height;
+
+    ctx.drawImage(player.image, player.x, player.y, player.width, player.height);
+}
+
+function playRandomAudio(audioPrefix) {
+    const audioIndex = Math.floor(Math.random() * 7) + 1;
+    const audio = new Audio(`${audioPrefix}${audioIndex}.mp3`);
+
+    if (currentAudio) {
+        currentAudio.pause();
+        currentAudio.currentTime = 0;
+    }
+
+    audio.play();
+    currentAudio = audio;
+
+    audio.addEventListener('ended', () => {
+        audio.currentTime = 0;
+        audio.pause();
+    });
+}
+
+function checkMilestone() {
+    if (score >= 1000 ) { // 播放结算音乐
+        backgroundMusic.pause(); // 停止背景音乐
+        updateMusic.play();
+    }
+
+    if (score >= lastMilestone + 200) {
+        lastMilestone += 200;
+        playRandomAudio('祖');
+    }
+}
+function playRandomDeathAudio() {
+    playRandomAudio('兵');
+}
+
+function showGameOver() {
+    gameOver = true;
+    document.getElementById('finalScore').textContent = score;
+    document.getElementById('gameOverScreen').style.display = 'flex';
+    weddingMarch.pause(); // 在游戏结束时停止播放婚礼进行曲
+    weddingMarch.currentTime = 0;
+}
+
+function detectCollision() {
+    fishArray.forEach((fish, index) => {
+        const dx = player.x - fish.x;
+        const dy = player.y - fish.y;
+        const distance = Math.sqrt(dx * dx + dy * dy);
+
+        if (distance < player.width / 2 + fish.width / 2) {
+            if (player.width > fish.width) {
+                score += 10;
+                fishArray.splice(index, 1);
+                player.width += 1.5;
+                player.height += 1.5;
+                checkMilestone();
+                document.getElementById('score').textContent = 'Score: ' + score;
+                changeBackgroundBasedOnScore();
+                checkScoreForImageChange();
+            } else {
+                playRandomDeathAudio();
+                showGameOver();
+            }
+        }
+    });
+}
+
+function checkScoreForImageChange() {
+    if (score >= 1000) {
+        player.image.src = '屏幕截图 2024-07-04 195418.png';
+        fishArray.forEach(fish => {
+            fish.image.src = '屏幕截图 2024-01-07 125214.png';
+        });
+    }
+}
+
+function changeBackgroundBasedOnScore() {
+    let backgroundImage = '';
+
+    if (score >= 1000) {
+        backgroundImage = 'url("MTXX_MH20240815_182631961.jpg")';
+    } else if (score >= 800) {
+        backgroundImage = 'url("屏幕截图 2024-08-15 180511.png")';
+    } else if (score >= 520) {
+        backgroundImage = 'url("MTXX_MH20240815_183255941.jpg")';
+    } else if (score >= 200) {
+        backgroundImage = 'url("屏幕截图 2024-08-15 180250.png")';
+    } else {
+        backgroundImage = 'url("屏幕截图 2024-07-04 181357.png")';
+    }
+
+    if (currentBackground !== backgroundImage) {
+        document.getElementById('gameCanvas').style.backgroundImage = backgroundImage;
+        currentBackground = backgroundImage;
+    }
+}
+
+function update() {
+    if (!gamePaused && !gameOver) {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        updatePlayer();
+        fishArray.forEach(fish => {
+            fish.speed = 1 + (score / 1000) * 3;
+            fish.update();
+        });
+        detectCollision();
+
+        document.getElementById('score').textContent = 'Score: ' + score;
+    }
+    requestAnimationFrame(update);
+}
+
+window.addEventListener('keydown', (e) => {
+    if (e.key === 'ArrowRight') player.dx = player.speed;
+    if (e.key === 'ArrowLeft') player.dx = -player.speed;
+    if (e.key === 'ArrowUp') player.dy = -player.speed;
+    if (e.key === 'ArrowDown') player.dy = player.speed;
+    if (e.key === 'Enter') startGame();
+    if (e.key === ' ') togglePause();
+    if (e.key === 'Escape') window.close();
+});
+
+window.addEventListener('keyup', (e) => {
+    if (e.key === 'ArrowRight' || e.key === 'ArrowLeft') player.dx = 0;
+    if (e.key === 'ArrowUp' || e.key === 'ArrowDown') player.dy = 0;
+});
+
+document.getElementById('pauseButton').addEventListener('click', togglePause);
+
+document.getElementById('resumeButton').addEventListener('click', togglePause);
+
+document.getElementById('exitButton').addEventListener('click', () => {
+    window.close();
+});
+
+document.getElementById('startButton').addEventListener('click', startGame);
+
+function togglePause() {
+    gamePaused = !gamePaused;
+    document.getElementById('pauseButton').style.display = gamePaused ? 'none' : 'inline';
+    document.getElementById('resumeButton').style.display = gamePaused ? 'inline' : 'none';
+}
+
+function startGame() {
+    document.getElementById('startScreen').style.display = 'none';
+    update();
+}
+
+setInterval(spawnFish, 1550);
+</script>
+</body>
+</html>
